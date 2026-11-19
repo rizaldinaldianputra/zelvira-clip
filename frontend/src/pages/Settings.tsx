@@ -225,17 +225,20 @@ export const Settings: React.FC = () => {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase">Model Pengujian</label>
               <div className="space-y-1.5">
-                {models.length > 0 ? (
+                {allModels.length > 0 ? (
                   <select
                     value={testModel}
                     onChange={(e) => setTestModel(e.target.value)}
                     className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
                   >
-                    {models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.id})
-                      </option>
-                    ))}
+                    {allModels
+                      .filter((m) => provider === "custom" || m.provider === provider || m.id.startsWith(provider))
+                      .concat(allModels.filter((m) => provider !== "custom" && m.provider !== provider && !m.id.startsWith(provider)))
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.id})
+                        </option>
+                      ))}
                   </select>
                 ) : (
                   <input
@@ -243,6 +246,11 @@ export const Settings: React.FC = () => {
                     value={testModel}
                     onChange={(e) => setTestModel(e.target.value)}
                     placeholder="misal: gpt-4o-mini, meta/llama-3.1-70b-instruct"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
+                  />
+                )}
+              </div>
+            </div>
                     className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
                   />
                 )}
@@ -507,8 +515,7 @@ export const Settings: React.FC = () => {
                     </select>
                   </td>
                   <td className="py-4 pl-4">
-                    <input
-                      type="text"
+                    <select
                       value={agentMappings["metadata"]?.model || "gpt-4o-mini"}
                       onChange={(e) =>
                         setAgentMappings((prev) => ({
@@ -516,9 +523,14 @@ export const Settings: React.FC = () => {
                           metadata: { ...prev.metadata, model: e.target.value },
                         }))
                       }
-                      placeholder="gpt-4o-mini"
                       className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
-                    />
+                    >
+                      {allModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.id})
+                        </option>
+                      ))}
+                    </select>
                   </td>
                 </tr>
               </tbody>
