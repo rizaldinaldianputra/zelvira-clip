@@ -249,11 +249,6 @@ export const Settings: React.FC = () => {
                     className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
                   />
                 )}
-              </div>
-            </div>
-                    className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
-                  />
-                )}
                 {/* Manual input override if user wants custom string */}
                 <input
                   type="text"

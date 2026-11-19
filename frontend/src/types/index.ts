@@ -76,6 +76,7 @@ export interface ModelSuggestion {
   id: string
   name: string
   description: string
+  provider?: string
   recommended_for?: string
 }
 
