@@ -22,7 +22,7 @@ export const Navbar: React.FC = () => {
             <Scissors className="h-5 w-5" />
           </div>
           <span className="bg-gradient-to-r from-purple-600 via-indigo-500 to-pink-500 bg-clip-text text-transparent">
-            AI Clipper
+            Zelvira AI Clipper
           </span>
         </Link>
 

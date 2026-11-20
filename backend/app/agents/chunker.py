@@ -33,11 +33,11 @@ class ChunkerAgent(BaseAgent):
 
             # Check if chunk reached target duration or is the last segment
             if chunk_duration >= self.target_chunk_sec or i == n - 1:
-                # Format chunk as [mm:ss] text
+                # Format chunk as [timestamp_sec] text so LLM knows absolute seconds accurately
                 formatted_lines = []
                 for s in current_chunk_segments:
-                    time_label = format_seconds_to_mmss(s.start)
-                    formatted_lines.append(f"[{time_label}] {s.text}")
+                    time_label_mmss = format_seconds_to_mmss(s.start)
+                    formatted_lines.append(f"[{time_label_mmss} | {s.start:.1f}s] {s.text}")
 
                 chunks.append(TranscriptChunk(
                     chunk_index=chunk_idx,

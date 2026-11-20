@@ -51,7 +51,7 @@ def publish_event(job_id: str, status: str, progress: int, message: str, error: 
     except Exception as e:
         logger.warning(f"Could not publish Redis event for job {job_id}: {e}")
 
-def update_job_status(db, job_id: str, status: str, progress: int, error: Optional[str] = None, failed_step: Optional[str] = None):
+def update_job_status(db, job_id: str, status: str, progress: int, error: Optional[str] = None, failed_step: Optional[str] = None, message: Optional[str] = None):
     job = db.query(Job).filter(Job.id == job_id).first()
     if job:
         job.status = status
@@ -61,7 +61,8 @@ def update_job_status(db, job_id: str, status: str, progress: int, error: Option
         if failed_step is not None:
             job.failed_step = failed_step
         db.commit()
-    publish_event(job_id, status, progress, f"Job {status}: {progress}%", error)
+    log_msg = message or f"Job {status}: {progress}%"
+    publish_event(job_id, status, progress, log_msg, error)
 
 def get_agent_config(db, user_id: str, agent_name: str) -> tuple[Optional[str], str, str, Optional[str]]:
     """
@@ -117,15 +118,20 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
 
             if current_step == "ingest" or not os.path.exists(raw_video_path):
                 current_step = "ingest"
-                update_job_status(db, job_id, "downloading", 10)
+                update_job_status(db, job_id, "downloading", 5, message="Memulai unduhan video...")
                 
                 ingest_agent = IngestAgent()
                 upload_file = str(job_dir / "uploaded_input") if job.source_type == "upload" else None
+
+                def on_download_progress(scaled_p: int, log_text: str):
+                    update_job_status(db, job_id, "downloading", scaled_p, message=log_text)
+
                 ingest_out = ingest_agent.run(
                     job_id=job_id,
                     source_type=job.source_type,
                     source_url=job.source_url,
-                    uploaded_file_path=upload_file
+                    uploaded_file_path=upload_file,
+                    progress_callback=on_download_progress
                 )
                 
                 job.title = ingest_out.title
@@ -145,7 +151,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             transcript_json_path = str(job_dir / "transcript.json")
             if current_step in ("ingest", "transcribe") or not os.path.exists(transcript_json_path):
                 current_step = "transcribe"
-                update_job_status(db, job_id, "transcribing", 25)
+                update_job_status(db, job_id, "transcribing", 25, message="Mentranskrip audio dengan faster-whisper (Int8 Multi-core)...")
 
                 transcribe_agent = TranscribeAgent()
                 lang_pref = job_settings.get("language", "auto")
@@ -160,7 +166,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             chunks_json_path = str(job_dir / "chunks.json")
             if current_step in ("ingest", "transcribe", "chunk") or not os.path.exists(chunks_json_path):
                 current_step = "chunk"
-                update_job_status(db, job_id, "analyzing", 40)
+                update_job_status(db, job_id, "analyzing", 40, message="Membagi transkrip menjadi segmen analisis...")
 
                 chunker_agent = ChunkerAgent(target_chunk_sec=480.0, overlap_sec=30.0)
                 chunks = chunker_agent.run(transcript_data)
@@ -176,7 +182,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             candidates_json_path = str(job_dir / "candidates.json")
             if current_step in ("ingest", "transcribe", "chunk", "find_moments") or not os.path.exists(candidates_json_path):
                 current_step = "find_moments"
-                update_job_status(db, job_id, "analyzing", 50)
+                update_job_status(db, job_id, "analyzing", 50, message="AI mencari momen highlight terbaik secara paralel...")
 
                 key, model, provider, base_url = get_agent_config(db, user_id, "moment_finder")
                 if not key:
@@ -214,7 +220,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             ranked_json_path = str(job_dir / "ranked_moments.json")
             if current_step in ("ingest", "transcribe", "chunk", "find_moments", "rank") or not os.path.exists(ranked_json_path):
                 current_step = "rank"
-                update_job_status(db, job_id, "analyzing", 65)
+                update_job_status(db, job_id, "analyzing", 65, message="Memilih dan meranking klip paling viral...")
 
                 key, model, provider, base_url = get_agent_config(db, user_id, "ranker")
                 ranker_agent = RankerAgent()
@@ -246,7 +252,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             refined_json_path = str(job_dir / "refined_clips.json")
             if current_step in ("ingest", "transcribe", "chunk", "find_moments", "rank", "refine_boundary") or not os.path.exists(refined_json_path):
                 current_step = "refine_boundary"
-                update_job_status(db, job_id, "analyzing", 72)
+                update_job_status(db, job_id, "analyzing", 72, message="Menyelaraskan batas awal-akhir kalimat klip...")
 
                 refiner_agent = BoundaryRefinerAgent()
                 refined_clips = refiner_agent.run(
@@ -266,7 +272,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             cut_clips_json_path = str(job_dir / "cut_clips.json")
             if current_step in ("ingest", "transcribe", "chunk", "find_moments", "rank", "refine_boundary", "cut") or not os.path.exists(cut_clips_json_path):
                 current_step = "cut"
-                update_job_status(db, job_id, "rendering", 78)
+                update_job_status(db, job_id, "rendering", 78, message="Memotong video highlight...")
 
                 cutter_agent = ClipCutterAgent()
                 cut_paths = cutter_agent.run(job_id, raw_video_path, refined_clips)
@@ -282,7 +288,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             reframed_json_path = str(job_dir / "reframed_clips.json")
             if current_step in ("ingest", "transcribe", "chunk", "find_moments", "rank", "refine_boundary", "cut", "reframe") or not os.path.exists(reframed_json_path):
                 current_step = "reframe"
-                update_job_status(db, job_id, "rendering", 85)
+                update_job_status(db, job_id, "rendering", 85, message="Mengubah rasio ke 9:16 & pelacakan wajah...")
 
                 layout = job_settings.get("layout", "focus")
                 custom_header = job_settings.get("custom_header_text")
@@ -300,7 +306,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             subtitled_json_path = str(job_dir / "subtitled_clips.json")
             if current_step in ("ingest", "transcribe", "chunk", "find_moments", "rank", "refine_boundary", "cut", "reframe", "subtitle") or not os.path.exists(subtitled_json_path):
                 current_step = "subtitle"
-                update_job_status(db, job_id, "rendering", 92)
+                update_job_status(db, job_id, "rendering", 92, message="Membakar subtitle animasi kata-per-kata...")
 
                 preset = job_settings.get("subtitle_preset", "bold_yellow")
                 subtitle_agent = SubtitleAgent()
@@ -321,7 +327,7 @@ def run_pipeline(self, job_id: str, from_step: Optional[str] = None):
             # STEP 10: METADATA & THUMBNAILS (LLM)
             # -------------------------------------------------------------
             current_step = "metadata"
-            update_job_status(db, job_id, "rendering", 96)
+            update_job_status(db, job_id, "rendering", 96, message="Membuat judul viral & thumbnail klip...")
 
             key, model, provider, base_url = get_agent_config(db, user_id, "metadata")
             meta_agent = MetadataAgent()

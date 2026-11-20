@@ -9,12 +9,17 @@ from app.core.config import settings
 Base = declarative_base()
 
 # Async engine for FastAPI endpoints
+async_engine_kwargs = {
+    "echo": False,
+    "pool_pre_ping": True,
+}
+if not settings.DATABASE_URL.startswith("sqlite"):
+    async_engine_kwargs["pool_size"] = 10
+    async_engine_kwargs["max_overflow"] = 20
+
 async_engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    **async_engine_kwargs
 )
 AsyncSessionLocal = async_sessionmaker(
     bind=async_engine,
@@ -29,12 +34,17 @@ sync_url = settings.DATABASE_SYNC_URL
 if sync_url.startswith("postgresql://"):
     sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
+sync_engine_kwargs = {
+    "echo": False,
+    "pool_pre_ping": True,
+}
+if not sync_url.startswith("sqlite"):
+    sync_engine_kwargs["pool_size"] = 10
+    sync_engine_kwargs["max_overflow"] = 20
+
 sync_engine = create_engine(
     sync_url,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    **sync_engine_kwargs
 )
 SyncSessionLocal = sessionmaker(
     bind=sync_engine,

@@ -18,12 +18,14 @@ class TranscribeAgent(BaseAgent):
 
     def _get_model(self) -> WhisperModel:
         if self._model is None:
-            logger.info(f"Loading faster-whisper model: {self.model_size}...")
-            # Use CPU by default in standard docker/compose or compute_type="int8"
+            logger.info(f"Loading faster-whisper model: {self.model_size} with multithreading...")
+            # Use CPU with int8 and 4 threads for high performance
             self._model = WhisperModel(
                 self.model_size,
                 device="cpu",
-                compute_type="int8"
+                compute_type="int8",
+                cpu_threads=4,
+                num_workers=2
             )
         return self._model
 

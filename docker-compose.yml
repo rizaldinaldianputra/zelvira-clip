@@ -87,6 +87,22 @@ services:
     depends_on:
       - backend
 
+  # Optional Standalone LiteLLM Proxy Gateway
+  # When deployed, can serve as external proxy on port 4000
+  litellm_proxy:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: clipper_litellm_proxy
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "2"]
+    environment:
+      - LITELLM_MASTER_KEY=sk-clipper-master-secret-key-change-in-prod
+    profiles:
+      - proxy-mode
+
 volumes:
   postgres_data:
   redis_data:

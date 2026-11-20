@@ -27,7 +27,7 @@ class ReframeAgent(BaseAgent):
         self.target_width = target_width
         self.target_height = target_height
 
-    def _detect_faces_trajectory(self, video_path: str, sample_interval_sec: float = 0.25) -> Tuple[float, float, int, int]:
+    def _detect_faces_trajectory(self, video_path: str, sample_interval_sec: float = 0.5) -> Tuple[float, float, int, int]:
         """
         Samples video every `sample_interval_sec` and tracks streamer face center (normalized 0.0 - 1.0).
         Returns: (smoothed_avg_center_x, smoothed_avg_center_y, video_width, video_height)
@@ -91,13 +91,20 @@ class ReframeAgent(BaseAgent):
         job_id: str,
         clip_paths: List[str],
         layout: str = "focus", # 'focus', 'split', or 'header_banner'
-        banner_text: Optional[str] = None
+        banner_text: Optional[str] = None,
+        font_size: Optional[int] = 48,
+        font_family: Optional[str] = "Arial",
+        font_color: Optional[str] = None
     ) -> List[str]:
         reframed_paths: List[str] = []
 
+        # Safe defaults and fallbacks for custom fonts and sizes
+        fs = font_size if (font_size and font_size >= 16 and font_size <= 120) else 48
+        font_param = f":font='{font_family}'" if font_family and font_family != "Default" else ""
+
         for idx, clip_path in enumerate(clip_paths):
             output_path = clip_path.replace("_raw.mp4", "_reframed.mp4")
-            logger.info(f"[{job_id}] Reframing clip #{idx} to 9:16 ({layout} layout)...")
+            logger.info(f"[{job_id}] Reframing clip #{idx} to 9:16 ({layout} layout, fontsize={fs})...")
 
             # 1. Detect face coordinates
             center_x, center_y, src_w, src_h = self._detect_faces_trajectory(clip_path)
@@ -124,12 +131,82 @@ class ReframeAgent(BaseAgent):
                 crop_x = int(np.clip(center_x * src_w - (crop_w / 2), 0, src_w - crop_w))
                 crop_y = 0
                 clean_banner = (banner_text or "HIGHLIGHT MOMENT").replace("'", "").replace(":", "")
+                text_col = font_color or "white"
 
                 filter_complex = (
                     f"[0:v]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1680:flags=lanczos[vmain];"
                     f"color=c=black:s=1080x240[vbox];"
-                    f"[vbox]drawtext=text='{clean_banner}':fontcolor=white:fontsize=48:box=1:boxcolor=black@0.8:boxborderw=10:x=(w-text_w)/2:y=(h-text_h)/2[vbanner];"
+                    f"[vbox]drawtext=text='{clean_banner}'{font_param}:fontcolor={text_col}:fontsize={fs}:box=1:boxcolor=black@0.8:boxborderw=10:x=(w-text_w)/2:y=(h-text_h)/2[vbanner];"
                     f"[vbanner][vmain]vstack=inputs=2[v]"
+                )
+            elif layout == "header_white":
+                # Layout Template: Banner putih di atas (240px) dengan teks hitam/custom + video 9:16 di bawah
+                crop_w = int(src_h * (9.0 / 16.0))
+                crop_h = src_h
+                crop_x = int(np.clip(center_x * src_w - (crop_w / 2), 0, src_w - crop_w))
+                crop_y = 0
+                clean_banner = (banner_text or "HIGHLIGHT MOMENT").replace("'", "").replace(":", "")
+                text_col = font_color or "black"
+
+                filter_complex = (
+                    f"[0:v]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1680:flags=lanczos[vmain];"
+                    f"color=c=white:s=1080x240[vbox];"
+                    f"[vbox]drawtext=text='{clean_banner}'{font_param}:fontcolor={text_col}:fontsize={fs}:x=(w-text_w)/2:y=(h-text_h)/2[vbanner];"
+                    f"[vbanner][vmain]vstack=inputs=2[v]"
+                )
+            elif layout == "footer_banner":
+                # Layout Template: Video di atas (1680px) + Footer Banner tulisan custom di bawah (240px)
+                crop_w = int(src_h * (9.0 / 16.0))
+                crop_h = src_h
+                crop_x = int(np.clip(center_x * src_w - (crop_w / 2), 0, src_w - crop_w))
+                crop_y = 0
+                clean_banner = (banner_text or "HIGHLIGHT MOMENT").replace("'", "").replace(":", "")
+                text_col = font_color or "yellow"
+
+                filter_complex = (
+                    f"[0:v]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1680:flags=lanczos[vmain];"
+                    f"color=c=black:s=1080x240[vbox];"
+                    f"[vbox]drawtext=text='{clean_banner}'{font_param}:fontcolor={text_col}:fontsize={fs}:box=1:boxcolor=black@0.8:boxborderw=10:x=(w-text_w)/2:y=(h-text_h)/2[vfooter];"
+                    f"[vmain][vfooter]vstack=inputs=2[v]"
+                )
+            elif layout == "top_bottom_banner":
+                # Layout Template: Header Banner atas hitam (160px) + Video Tengah (1600px) + Footer Banner bawah (160px)
+                crop_w = int(src_h * (9.0 / 16.0))
+                crop_h = src_h
+                crop_x = int(np.clip(center_x * src_w - (crop_w / 2), 0, src_w - crop_w))
+                crop_y = 0
+                clean_banner = (banner_text or "HIGHLIGHT MOMENT").replace("'", "").replace(":", "")
+                text_col = font_color or "white"
+
+                filter_complex = (
+                    f"[0:v]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1600:flags=lanczos[vmain];"
+                    f"color=c=black:s=1080x160[vtop];"
+                    f"[vtop]drawtext=text='{clean_banner}'{font_param}:fontcolor={text_col}:fontsize={fs}:box=1:boxcolor=black@0.8:boxborderw=8:x=(w-text_w)/2:y=(h-text_h)/2[vheader];"
+                    f"color=c=black:s=1080x160[vbot];"
+                    f"[vbot]drawtext=text='TONTON SAMPAI HABIS!':fontcolor=yellow:fontsize=36:box=1:boxcolor=black@0.8:boxborderw=8:x=(w-text_w)/2:y=(h-text_h)/2[vfooter];"
+                    f"[vheader][vmain][vfooter]vstack=inputs=3[v]"
+                )
+            elif layout == "fit_center_black":
+                # Layout Clipper Klasik: Video 16:9 utuh di tengah, latar belakang HITAM di atas & bawah dengan teks clipper
+                clean_banner = (banner_text or "HIGHLIGHT MOMENT").replace("'", "").replace(":", "")
+                text_col = font_color or "white"
+                filter_complex = (
+                    f"color=c=black:s=1080x1920[vbg];"
+                    f"[0:v]scale=1080:-1:flags=lanczos[vvid];"
+                    f"[vbg][vvid]overlay=0:(H-h)/2[vmid];"
+                    f"[vmid]drawtext=text='{clean_banner}'{font_param}:fontcolor={text_col}:fontsize={fs}:x=(w-text_w)/2:y=200,"
+                    f"drawtext=text='SWIPE UP / TONTON SAMPAI HABIS!':fontcolor=yellow:fontsize=38:x=(w-text_w)/2:y=1650[v]"
+                )
+            elif layout == "fit_center_white":
+                # Layout Clipper Modern: Video 16:9 utuh di tengah, latar belakang PUTIH di atas & bawah dengan teks hitam tebal
+                clean_banner = (banner_text or "HIGHLIGHT MOMENT").replace("'", "").replace(":", "")
+                text_col = font_color or "black"
+                filter_complex = (
+                    f"color=c=white:s=1080x1920[vbg];"
+                    f"[0:v]scale=1080:-1:flags=lanczos[vvid];"
+                    f"[vbg][vvid]overlay=0:(H-h)/2[vmid];"
+                    f"[vmid]drawtext=text='{clean_banner}'{font_param}:fontcolor={text_col}:fontsize={fs}:fontweight=bold:x=(w-text_w)/2:y=220,"
+                    f"drawtext=text='TONTON SAMPAI HABIS!':fontcolor=red:fontsize=40:fontweight=bold:x=(w-text_w)/2:y=1640[v]"
                 )
             else:
                 # Layout Focus (single vertical camera tracking face):
@@ -138,6 +215,10 @@ class ReframeAgent(BaseAgent):
                 crop_h = src_h
                 crop_x = int(np.clip(center_x * src_w - (crop_w / 2), 0, src_w - crop_w))
                 crop_y = 0
+
+                filter_complex = (
+                    f"[0:v]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1920:flags=lanczos[v]"
+                )
 
                 filter_complex = (
                     f"[0:v]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1920:flags=lanczos[v]"

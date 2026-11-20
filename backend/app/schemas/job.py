@@ -6,7 +6,8 @@ from app.schemas.clip import ClipResponse
 class JobSettings(BaseModel):
     clip_count: int = Field(default=5, ge=1, le=10)
     target_duration: int = Field(default=60, ge=15, le=120) # seconds
-    layout: Literal["focus", "split"] = "focus"
+    layout: Literal["focus", "split", "header_banner", "header_white", "footer_banner", "top_bottom_banner", "fit_center_black", "fit_center_white"] = "focus"
+    custom_header_text: Optional[str] = None
     subtitle_preset: Literal["bold_yellow", "classic", "neon"] = "bold_yellow"
     language: str = "auto" # 'auto', 'id', 'en'
 
@@ -38,3 +39,5 @@ class JobDetailResponse(JobResponse):
     estimated_cost_usd: float = 0.0
     transcript_preview: Optional[str] = None
     step_history: List[Dict[str, Any]] = []
+    live_status_message: Optional[str] = None
+    estimated_remaining_sec: Optional[int] = None

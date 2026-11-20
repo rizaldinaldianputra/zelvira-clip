@@ -68,9 +68,9 @@ class BoundaryRefinerAgent(BaseAgent):
             final_start = max(0.0, best_start - self.start_pad_sec)
             final_end = min(video_duration, best_end + self.end_pad_sec) if video_duration > 0 else best_end + self.end_pad_sec
 
-            # Ensure minimum duration of at least 3 seconds
-            if final_end - final_start < 3.0:
-                final_end = min(video_duration, final_start + 3.0)
+            # Ensure minimum duration of at least 15 seconds for a proper short clip
+            if final_end - final_start < 15.0:
+                final_end = min(video_duration, final_start + 15.0)
 
             refined_clips.append(RefinedClip(
                 original_start=orig_start,

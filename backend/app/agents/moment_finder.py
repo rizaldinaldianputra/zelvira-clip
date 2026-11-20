@@ -30,9 +30,14 @@ class MomentFinderAgent(BaseAgent):
         base_url: Optional[str] = None,
         job_id: Optional[str] = None
     ) -> tuple[List[MomentCandidate], List[Dict[str, Any]]]:
+        min_dur = max(15, int(target_duration * 0.6))
+        max_dur = min(180, int(target_duration * 1.5))
+
         prompt = self.prompt_template.format(
             transcript_chunk=chunk.formatted_text,
-            target_duration=target_duration
+            target_duration=target_duration,
+            min_duration=min_dur,
+            max_duration=max_dur
         )
 
         messages = [

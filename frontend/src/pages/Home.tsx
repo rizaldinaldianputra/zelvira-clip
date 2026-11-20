@@ -23,7 +23,7 @@ export const Home: React.FC = () => {
   const [file, setFile] = useState<File | null>(null)
   const [clipCount, setClipCount] = useState<number>(5)
   const [targetDuration, setTargetDuration] = useState<number>(60)
-  const [layout, setLayout] = useState<"focus" | "split" | "header_banner">("focus")
+  const [layout, setLayout] = useState<"focus" | "split" | "header_banner" | "footer_banner" | "top_bottom_banner">("focus")
   const [customHeader, setCustomHeader] = useState<string>("REAKSI STREAMER TERBAIK 🔥")
   const [subtitlePreset, setSubtitlePreset] = useState<"bold_yellow" | "classic" | "neon">("bold_yellow")
   const [language, setLanguage] = useState<string>("auto")
@@ -234,9 +234,9 @@ export const Home: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Target Duration */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Target Durasi</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[30, 60, 90].map((dur) => (
+              <label className="text-xs font-medium text-muted-foreground">Target Durasi Klip</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[15, 30, 60, 90].map((dur) => (
                   <button
                     key={dur}
                     type="button"
@@ -247,7 +247,7 @@ export const Home: React.FC = () => {
                         : "border-border hover:bg-muted text-muted-foreground"
                     }`}
                   >
-                    {dur} detik
+                    {dur}s
                   </button>
                 ))}
               </div>
@@ -271,8 +271,8 @@ export const Home: React.FC = () => {
 
             {/* Layout */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Layout & Template</label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Layout & Frame Template</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setLayout("focus")}
@@ -281,7 +281,7 @@ export const Home: React.FC = () => {
                       ? "border-purple-600 bg-purple-600/10 text-purple-500"
                       : "border-border hover:bg-muted text-muted-foreground"
                   }`}
-                  title="Crop penuh vertikal mengikuti wajah streamer"
+                  title="Crop vertikal 9:16 mengikuti wajah streamer"
                 >
                   Fokus Wajah
                 </button>
@@ -307,20 +307,44 @@ export const Home: React.FC = () => {
                   }`}
                   title="Template dengan banner teks kustom di bagian atas video"
                 >
-                  Banner Teks
+                  Banner Atas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayout("footer_banner")}
+                  className={`py-2 text-[11px] font-semibold rounded-lg border transition ${
+                    layout === "footer_banner"
+                      ? "border-purple-600 bg-purple-600/10 text-purple-500"
+                      : "border-border hover:bg-muted text-muted-foreground"
+                  }`}
+                  title="Template dengan banner teks kustom di bagian bawah video"
+                >
+                  Banner Bawah
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayout("top_bottom_banner")}
+                  className={`py-2 text-[11px] font-semibold rounded-lg border transition ${
+                    layout === "top_bottom_banner"
+                      ? "border-purple-600 bg-purple-600/10 text-purple-500"
+                      : "border-border hover:bg-muted text-muted-foreground"
+                  }`}
+                  title="Frame atas + bawah untuk teks keterangan clipper"
+                >
+                  Atas & Bawah
                 </button>
               </div>
 
-              {layout === "header_banner" && (
+              {(layout === "header_banner" || layout === "footer_banner" || layout === "top_bottom_banner") && (
                 <div className="pt-2 space-y-1">
                   <label className="text-[10px] uppercase font-bold text-purple-500">
-                    Teks Banner Kustom (Frame Atas)
+                    Teks Frame Kustom ({layout === "footer_banner" ? "Bawah" : "Atas"})
                   </label>
                   <input
                     type="text"
                     value={customHeader}
                     onChange={(e) => setCustomHeader(e.target.value)}
-                    placeholder="Contoh: REAKSI OURAA KETEMU..."
+                    placeholder="Contoh: REAKSI OURAA KETEMU... / TONTON SAMPAI HABIS!"
                     className="w-full rounded-lg border border-purple-500/30 bg-background px-3 py-1.5 text-xs focus:outline-none focus:border-purple-600"
                   />
                 </div>

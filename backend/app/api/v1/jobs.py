@@ -191,6 +191,27 @@ async def get_job(
             "message": job.error if is_failed else ("Selesai" if is_success else "Belum diproses")
         })
 
+    # Fetch latest redis progress message if available
+    live_msg = None
+    try:
+        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        cached_event = await r.get(f"job_latest:{job_id}")
+        await r.aclose()
+        if cached_event:
+            ev = json.loads(cached_event)
+            live_msg = ev.get("message")
+    except Exception:
+        pass
+
+    # Estimate remaining duration based on video duration & progress
+    estimated_remaining_sec = None
+    if job.status not in ("done", "failed"):
+        v_dur = job.duration_sec or 600.0  # default assumption 10m
+        # With our optimized pipeline, total processing time is roughly ~0.15x of video duration + 30s overhead
+        total_expected_time = max(45, int(v_dur * 0.15 + 30))
+        remaining_ratio = max(0.02, (100 - job.progress) / 100.0)
+        estimated_remaining_sec = max(5, int(total_expected_time * remaining_ratio))
+
     return JobDetailResponse(
         id=job.id,
         user_id=job.user_id,
@@ -209,8 +230,28 @@ async def get_job(
         total_tokens=total_tokens,
         estimated_cost_usd=round(total_cost, 5),
         transcript_preview=transcript_preview,
-        step_history=step_history
+        step_history=step_history,
+        live_status_message=live_msg,
+        estimated_remaining_sec=estimated_remaining_sec
     )
+
+@router.get("/{job_id}/source-video")
+async def get_job_source_video(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(Job).where(and_(Job.id == job_id, Job.user_id == current_user.id))
+    job = (await db.execute(stmt)).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    raw_path = storage.get_full_path(f"jobs/{job_id}/raw.mp4")
+    if not os.path.exists(raw_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source raw video not found")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(path=raw_path, media_type="video/mp4")
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job(

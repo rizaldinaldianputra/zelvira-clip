@@ -34,6 +34,7 @@ class ModelSuggestion(BaseModel):
     id: str
     name: str
     description: str
+    provider: Optional[str] = None
     recommended_for: Optional[str] = None
 
 class AgentModelItem(BaseModel):

@@ -1,9 +1,10 @@
 import os
 import json
+import time
 import subprocess
 from pathlib import Path
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Callable
 import yt_dlp
 from app.agents.base import BaseAgent
 from app.core.config import settings
@@ -26,7 +27,8 @@ class IngestAgent(BaseAgent):
         job_id: str,
         source_type: str,
         source_url: Optional[str] = None,
-        uploaded_file_path: Optional[str] = None
+        uploaded_file_path: Optional[str] = None,
+        progress_callback: Optional[callable] = None
     ) -> IngestOutput:
         job_dir = Path(storage.get_full_path(f"jobs/{job_id}"))
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -35,7 +37,7 @@ class IngestAgent(BaseAgent):
         if source_type in ("youtube", "tiktok"):
             if not source_url:
                 raise ValueError("source_url is required for YouTube/TikTok jobs")
-            return self._download_from_url(job_id, source_url, source_type, target_video_path)
+            return self._download_from_url(job_id, source_url, source_type, target_video_path, progress_callback)
         elif source_type == "upload":
             if not uploaded_file_path or not os.path.exists(uploaded_file_path):
                 raise ValueError("Uploaded video file not found")
@@ -48,9 +50,58 @@ class IngestAgent(BaseAgent):
         job_id: str,
         url: str,
         source_type: str,
-        output_path: str
+        output_path: str,
+        progress_callback: Optional[callable] = None
     ) -> IngestOutput:
         logger.info(f"[{job_id}] Ingesting video from {source_type}: {url}")
+
+        last_progress_time = [0.0]
+
+        def _yt_dlp_hook(d):
+            if d.get("status") == "downloading":
+                now = time.time()
+                # Rate limit updates to at most once per 0.5s
+                if now - last_progress_time[0] < 0.5:
+                    return
+                last_progress_time[0] = now
+
+                downloaded = d.get("downloaded_bytes", 0)
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                speed = d.get("speed") or 0
+                eta = d.get("eta")
+
+                # Format human readable
+                def _fmt_size(b):
+                    if not b:
+                        return "0 B"
+                    if b >= 1024 * 1024 * 1024:
+                        return f"{b / (1024**3):.2f} GB"
+                    if b >= 1024 * 1024:
+                        return f"{b / (1024**2):.1f} MB"
+                    if b >= 1024:
+                        return f"{b / 1024:.0f} KB"
+                    return f"{b} B"
+
+                downloaded_str = _fmt_size(downloaded)
+                total_str = _fmt_size(total) if total else "Unknown size"
+                speed_str = f"{_fmt_size(speed)}/s" if speed else "Calculating..."
+                eta_str = f", ETA: {eta}s" if eta else ""
+
+                percent = 0.0
+                if total and total > 0:
+                    percent = min(100.0, max(0.0, (downloaded / total) * 100))
+                    # Map 0-100% download into progress scale 5% to 20%
+                    scaled_progress = int(5 + (percent * 0.15))
+                else:
+                    scaled_progress = 10
+
+                msg = f"Mengunduh video: {downloaded_str} / {total_str} ({percent:.1f}%) • Kecepatan: {speed_str}{eta_str}"
+                
+                if progress_callback:
+                    try:
+                        progress_callback(scaled_progress, msg)
+                    except Exception as ex:
+                        logger.debug(f"Progress callback error: {ex}")
 
         # yt-dlp configuration with aggressive retry and chunk streaming protection
         ydl_opts = {
@@ -67,6 +118,7 @@ class IngestAgent(BaseAgent):
             "http_chunk_size": 10485760,  # 10MB chunking to prevent TCP stream dropping prematurely
             "buffersize": 1024 * 64,
             "socket_timeout": 60,
+            "progress_hooks": [_yt_dlp_hook],
         }
 
         # Step 1: Extract info first without downloading to check metadata and limits
