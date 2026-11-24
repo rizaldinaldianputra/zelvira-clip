@@ -62,6 +62,12 @@ SUGGESTED_MODELS: Dict[str, List[ModelSuggestion]] = {
         ModelSuggestion(id="mistralai/mistral-large-2-instruct", name="Mistral Large 2", description="High-reasoning multilingual model", provider="nvidia", recommended_for="Ranker"),
         ModelSuggestion(id="google/gemma-2-27b-it", name="Gemma 2 27B", description="Google Gemma on NVIDIA NIM", provider="nvidia", recommended_for="Moment Finder"),
     ],
+    "mistral": [
+        ModelSuggestion(id="mistral-large-latest", name="Mistral Large 2", description="Mistral AI flagship frontier model", provider="mistral", recommended_for="Ranker & Complex Tasks"),
+        ModelSuggestion(id="mistral-small-latest", name="Mistral Small", description="Fast, low-latency and economical Mistral model", provider="mistral", recommended_for="Moment Finder & Metadata"),
+        ModelSuggestion(id="codestral-latest", name="Codestral", description="Specialized code and structured reasoning", provider="mistral", recommended_for="Metadata"),
+        ModelSuggestion(id="pixtral-12b-2409", name="Pixtral 12B", description="Multimodal vision-language model", provider="mistral", recommended_for="All Tasks"),
+    ],
     "custom": [
         ModelSuggestion(id="gpt-4o-mini", name="GPT-4o Mini (OpenAI-compatible)", description="Standard proxy model endpoint", provider="custom", recommended_for="All Tasks"),
         ModelSuggestion(id="gpt-4o", name="GPT-4o (OpenAI-compatible)", description="Flagship proxy model", provider="custom", recommended_for="Ranker"),
@@ -209,7 +215,7 @@ async def get_models(provider: Optional[str] = Query(None)):
     # If provider is openrouter, fetch live list of openrouter models
     if provider == "openrouter":
         try:
-            req = urllib.request.Request("https://openrouter.ai/api/v1/models", headers={"User-Agent": "ZelvuraClipper/1.0"})
+            req = urllib.request.Request("https://openrouter.ai/api/v1/models", headers={"User-Agent": "zelviraClipper/1.0"})
             with urllib.request.urlopen(req, timeout=4) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 live_models = []
@@ -235,7 +241,7 @@ async def get_models(provider: Optional[str] = Query(None)):
     # If provider is nvidia, fetch live list from NVIDIA NIM
     if provider == "nvidia":
         try:
-            req = urllib.request.Request("https://integrate.api.nvidia.com/v1/models", headers={"User-Agent": "ZelvuraClipper/1.0"})
+            req = urllib.request.Request("https://integrate.api.nvidia.com/v1/models", headers={"User-Agent": "zelviraClipper/1.0"})
             with urllib.request.urlopen(req, timeout=4) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 live_models = []

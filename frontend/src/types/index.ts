@@ -1,3 +1,13 @@
+export interface UserStorageQuota {
+  used_bytes: number
+  used_mb: number
+  used_gb: number
+  quota_bytes: number
+  quota_gb: number
+  percentage: number
+  total_videos: number
+}
+
 export interface User {
   id: string
   email: string

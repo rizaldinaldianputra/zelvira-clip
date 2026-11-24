@@ -11,7 +11,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Video,
-  Scissors
+  Scissors,
+  HardDrive,
+  FileVideo,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { Job } from "@/types"
@@ -37,10 +39,17 @@ export const Dashboard: React.FC = () => {
     refetchInterval: 3000,
   })
 
+  // Storage Quota (10 GB)
+  const { data: storageQuota } = useQuery({
+    queryKey: ["storageQuota"],
+    queryFn: api.getStorageQuota,
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (jobId: string) => api.deleteJob(jobId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] })
+      queryClient.invalidateQueries({ queryKey: ["storageQuota"] })
     },
   })
 
@@ -52,27 +61,68 @@ export const Dashboard: React.FC = () => {
   })
 
   return (
-    <div className="container max-w-6xl mx-auto px-4 py-8">
+    <div className="container max-w-6xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center space-x-2">
-            <LayoutDashboard className="h-7 w-7 text-purple-600" />
-            <span>Dashboard Riwayat Job</span>
+            <FileVideo className="h-7 w-7 text-purple-600" />
+            <span>Pustaka Video & Riwayat Project</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Pantau status pemrosesan pipeline klip video secara real-time
+            Riwayat seluruh project video clipper Anda dan pantau sisa kuota penyimpanan 10 GB.
           </p>
         </div>
 
         <Link
           to="/"
-          className="inline-flex items-center space-x-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-purple-700 transition"
+          className="inline-flex items-center space-x-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-purple-700 transition self-start sm:self-auto"
         >
           <Scissors className="h-4 w-4" />
           <span>Buat Klip Baru</span>
         </Link>
       </div>
+
+      {/* 10 GB Storage Quota Card */}
+      {storageQuota && (
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                <HardDrive className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-foreground">Kapasitas Penyimpanan Pengguna</h3>
+                <p className="text-xs text-muted-foreground">
+                  Setiap akun diberikan alokasi penyimpanan <strong>10 GB</strong> untuk menyimpan raw video & klip hasil render.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <p className="text-sm font-bold font-mono text-purple-400">
+                {storageQuota.used_gb.toFixed(2)} GB <span className="text-muted-foreground font-normal">/ {storageQuota.quota_gb} GB</span>
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {storageQuota.total_videos} video tersimpan ({storageQuota.percentage}%)
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden border border-border">
+            <div
+              className={`h-full transition-all duration-500 rounded-full ${
+                storageQuota.percentage > 90
+                  ? "bg-red-500"
+                  : storageQuota.percentage > 70
+                  ? "bg-amber-500"
+                  : "bg-purple-600"
+              }`}
+              style={{ width: `${storageQuota.percentage}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Loading Skeleton */}
       {isLoading && (

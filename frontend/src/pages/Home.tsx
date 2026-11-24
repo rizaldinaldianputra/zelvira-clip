@@ -11,8 +11,12 @@ import {
   FileVideo,
   CheckCircle2,
   KeyRound,
+  HardDrive,
+  Clock,
+  ArrowRight,
 } from "lucide-react"
 import { api } from "@/lib/api"
+import { formatDuration } from "@/lib/utils"
 
 export const Home: React.FC = () => {
   const navigate = useNavigate()
@@ -35,6 +39,18 @@ export const Home: React.FC = () => {
   const { data: keys = [] } = useQuery({
     queryKey: ["aiKeys"],
     queryFn: api.getKeys,
+  })
+
+  // User Storage Quota (10 GB)
+  const { data: storageQuota } = useQuery({
+    queryKey: ["storageQuota"],
+    queryFn: api.getStorageQuota,
+  })
+
+  // Pustaka Video / History Projects
+  const { data: recentJobs = [] } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: api.getJobs,
   })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,6 +164,35 @@ export const Home: React.FC = () => {
 
       {/* Main Input Form */}
       <form onSubmit={handleSubmit} className="space-y-8 rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-xl">
+        {/* User Storage Quota Banner (10 GB) */}
+        {storageQuota && (
+          <div className="rounded-xl border border-border bg-muted/30 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-2.5">
+              <HardDrive className="h-4 w-4 text-purple-500 shrink-0" />
+              <div>
+                <span className="font-semibold text-foreground">Kapasitas Penyimpanan Pustaka Video: </span>
+                <span className="font-mono text-purple-400 font-bold">
+                  {storageQuota.used_gb.toFixed(2)} GB / {storageQuota.quota_gb} GB
+                </span>
+                <span className="text-muted-foreground ml-1.5">({storageQuota.percentage}% terpakai)</span>
+              </div>
+            </div>
+
+            <div className="w-full sm:w-44 bg-muted rounded-full h-2 overflow-hidden border border-border">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  storageQuota.percentage > 90
+                    ? "bg-red-500"
+                    : storageQuota.percentage > 70
+                    ? "bg-amber-500"
+                    : "bg-purple-600"
+                }`}
+                style={{ width: `${storageQuota.percentage}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Source Type Selector */}
         <div className="flex rounded-xl bg-muted p-1">
           <button
@@ -192,6 +237,44 @@ export const Home: React.FC = () => {
             <p className="text-xs text-muted-foreground">
               Maksimal durasi video: 60 menit. Hanya video publik yang dapat diproses.
             </p>
+
+            {/* Pustaka Video & History Link Cepat */}
+            {recentJobs.length > 0 && (
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground flex items-center space-x-1.5">
+                    <FileVideo className="h-3.5 w-3.5 text-purple-500" />
+                    <span>Pustaka Link Project Sebelumnya (Klik untuk Pakai Ulang):</span>
+                  </span>
+                  <Link to="/dashboard" className="text-[11px] text-purple-400 hover:underline">
+                    Lihat Semua
+                  </Link>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {recentJobs
+                    .filter((j) => j.source_url)
+                    .slice(0, 5)
+                    .map((j) => (
+                      <button
+                        key={j.id}
+                        type="button"
+                        onClick={() => {
+                          if (j.source_url) setUrl(j.source_url)
+                        }}
+                        className={`text-left text-xs px-2.5 py-1.5 rounded-lg border transition truncate max-w-full sm:max-w-xs flex items-center space-x-1.5 ${
+                          url === j.source_url
+                            ? "bg-purple-600/15 border-purple-500/50 text-purple-300 font-semibold"
+                            : "bg-muted/30 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                        title={j.title || j.source_url}
+                      >
+                        <Youtube className="h-3 w-3 shrink-0 text-red-500" />
+                        <span className="truncate">{j.title || j.source_url}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

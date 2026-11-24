@@ -24,16 +24,16 @@ def seed():
     print("🌱 Seeding database with demo data...")
     with get_sync_db() as db:
         # Check if demo user already exists
-        demo_user = db.query(User).filter(User.email == "demo@zelvura.com").first()
+        demo_user = db.query(User).filter(User.email == "demo@zelvira.com").first()
         if not demo_user:
             demo_user = User(
                 id=str(uuid.uuid4()),
-                email="demo@zelvura.com",
+                email="demo@zelvira.com",
                 password_hash=get_password_hash("password123")
             )
             db.add(demo_user)
             db.commit()
-            print(f"✅ Created demo user: demo@zelvura.com (password: password123)")
+            print(f"✅ Created demo user: demo@zelvira.com (password: password123)")
         else:
             print("ℹ️ Demo user already exists.")
 

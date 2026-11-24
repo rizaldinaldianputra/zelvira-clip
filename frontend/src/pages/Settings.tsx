@@ -33,6 +33,7 @@ export const Settings: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>("")
   const [baseUrl, setBaseUrl] = useState<string>("")
   const [testModel, setTestModel] = useState<string>("gpt-4o-mini")
+  const [customModelMode, setCustomModelMode] = useState<boolean>(false)
 
   // Testing status
   const [testing, setTesting] = useState<boolean>(false)
@@ -44,6 +45,11 @@ export const Settings: React.FC = () => {
     moment_finder: { key_id: "", model: "gpt-4o-mini" },
     ranker: { key_id: "", model: "gpt-4o" },
     metadata: { key_id: "", model: "gpt-4o-mini" },
+  })
+  const [agentCustomInput, setAgentCustomInput] = useState<Record<string, boolean>>({
+    moment_finder: false,
+    ranker: false,
+    metadata: false,
   })
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false)
 
@@ -401,18 +407,44 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Model Pengujian</label>
-                  <select
-                    value={testModel}
-                    onChange={(e) => setTestModel(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
-                  >
-                    {(providerModels.length > 0 ? providerModels : allModels).map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.id})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">Model Pengujian</label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomModelMode(!customModelMode)}
+                      className="text-[11px] font-semibold text-purple-400 hover:text-purple-300 transition"
+                    >
+                      {customModelMode ? "← Pilih dari Daftar" : "+ Input Manual"}
+                    </button>
+                  </div>
+
+                  {customModelMode ? (
+                    <input
+                      type="text"
+                      value={testModel}
+                      onChange={(e) => setTestModel(e.target.value)}
+                      placeholder="Ketik model LiteLLM (contoh: gpt-4o, claude-3-5-sonnet, deepseek-chat)"
+                      className="w-full rounded-xl border border-purple-500/50 bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none font-mono"
+                    />
+                  ) : (
+                    <select
+                      value={testModel}
+                      onChange={(e) => setTestModel(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:border-purple-600 focus:outline-none"
+                    >
+                      {(() => {
+                        const modelsToShow = providerModels.length > 0 ? providerModels : (
+                          gatewayModels.filter((gm) => gm.provider.toLowerCase() === provider.toLowerCase())
+                        )
+                        const finalModels = modelsToShow.length > 0 ? modelsToShow : (allModels.length > 0 ? allModels : gatewayModels)
+                        return finalModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({m.id})
+                          </option>
+                        ))
+                      })()}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -664,22 +696,54 @@ export const Settings: React.FC = () => {
                           </select>
                         </td>
                         <td className="py-4 pl-4">
-                          <select
-                            value={agentMappings["moment_finder"]?.model || ""}
-                            onChange={(e) =>
-                              setAgentMappings((prev) => ({
-                                ...prev,
-                                moment_finder: { ...prev.moment_finder, model: e.target.value },
-                              }))
-                            }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
-                          >
-                            {getModelsForKey(agentMappings["moment_finder"]?.key_id).map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name} ({m.id})
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-muted-foreground">Pilihan Model:</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAgentCustomInput((prev) => ({
+                                    ...prev,
+                                    moment_finder: !prev.moment_finder,
+                                  }))
+                                }
+                                className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline font-semibold"
+                              >
+                                {agentCustomInput["moment_finder"] ? "← Pilih dari Daftar" : "+ Ketik Manual"}
+                              </button>
+                            </div>
+                            {agentCustomInput["moment_finder"] ? (
+                              <input
+                                type="text"
+                                value={agentMappings["moment_finder"]?.model || ""}
+                                onChange={(e) =>
+                                  setAgentMappings((prev) => ({
+                                    ...prev,
+                                    moment_finder: { ...prev.moment_finder, model: e.target.value },
+                                  }))
+                                }
+                                placeholder="misal: gpt-4o, claude-3-5-sonnet, deepseek/deepseek-chat"
+                                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
+                              />
+                            ) : (
+                              <select
+                                value={agentMappings["moment_finder"]?.model || ""}
+                                onChange={(e) =>
+                                  setAgentMappings((prev) => ({
+                                    ...prev,
+                                    moment_finder: { ...prev.moment_finder, model: e.target.value },
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
+                              >
+                                {getModelsForKey(agentMappings["moment_finder"]?.key_id).map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.name} ({m.id})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
                         </td>
                       </tr>
 
@@ -715,22 +779,54 @@ export const Settings: React.FC = () => {
                           </select>
                         </td>
                         <td className="py-4 pl-4">
-                          <select
-                            value={agentMappings["ranker"]?.model || ""}
-                            onChange={(e) =>
-                              setAgentMappings((prev) => ({
-                                ...prev,
-                                ranker: { ...prev.ranker, model: e.target.value },
-                              }))
-                            }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
-                          >
-                            {getModelsForKey(agentMappings["ranker"]?.key_id).map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name} ({m.id})
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-muted-foreground">Pilihan Model:</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAgentCustomInput((prev) => ({
+                                    ...prev,
+                                    ranker: !prev.ranker,
+                                  }))
+                                }
+                                className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline font-semibold"
+                              >
+                                {agentCustomInput["ranker"] ? "← Pilih dari Daftar" : "+ Ketik Manual"}
+                              </button>
+                            </div>
+                            {agentCustomInput["ranker"] ? (
+                              <input
+                                type="text"
+                                value={agentMappings["ranker"]?.model || ""}
+                                onChange={(e) =>
+                                  setAgentMappings((prev) => ({
+                                    ...prev,
+                                    ranker: { ...prev.ranker, model: e.target.value },
+                                  }))
+                                }
+                                placeholder="misal: gpt-4o, claude-3-5-sonnet, deepseek/deepseek-chat"
+                                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
+                              />
+                            ) : (
+                              <select
+                                value={agentMappings["ranker"]?.model || ""}
+                                onChange={(e) =>
+                                  setAgentMappings((prev) => ({
+                                    ...prev,
+                                    ranker: { ...prev.ranker, model: e.target.value },
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
+                              >
+                                {getModelsForKey(agentMappings["ranker"]?.key_id).map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.name} ({m.id})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
                         </td>
                       </tr>
 
@@ -766,22 +862,54 @@ export const Settings: React.FC = () => {
                           </select>
                         </td>
                         <td className="py-4 pl-4">
-                          <select
-                            value={agentMappings["metadata"]?.model || ""}
-                            onChange={(e) =>
-                              setAgentMappings((prev) => ({
-                                ...prev,
-                                metadata: { ...prev.metadata, model: e.target.value },
-                              }))
-                            }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
-                          >
-                            {getModelsForKey(agentMappings["metadata"]?.key_id).map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name} ({m.id})
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-muted-foreground">Pilihan Model:</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAgentCustomInput((prev) => ({
+                                    ...prev,
+                                    metadata: !prev.metadata,
+                                  }))
+                                }
+                                className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline font-semibold"
+                              >
+                                {agentCustomInput["metadata"] ? "← Pilih dari Daftar" : "+ Ketik Manual"}
+                              </button>
+                            </div>
+                            {agentCustomInput["metadata"] ? (
+                              <input
+                                type="text"
+                                value={agentMappings["metadata"]?.model || ""}
+                                onChange={(e) =>
+                                  setAgentMappings((prev) => ({
+                                    ...prev,
+                                    metadata: { ...prev.metadata, model: e.target.value },
+                                  }))
+                                }
+                                placeholder="misal: gpt-4o, claude-3-5-sonnet, deepseek/deepseek-chat"
+                                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
+                              />
+                            ) : (
+                              <select
+                                value={agentMappings["metadata"]?.model || ""}
+                                onChange={(e) =>
+                                  setAgentMappings((prev) => ({
+                                    ...prev,
+                                    metadata: { ...prev.metadata, model: e.target.value },
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:border-purple-600 focus:outline-none"
+                              >
+                                {getModelsForKey(agentMappings["metadata"]?.key_id).map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.name} ({m.id})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     </tbody>

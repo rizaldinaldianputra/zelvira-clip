@@ -41,3 +41,13 @@ class JobDetailResponse(JobResponse):
     step_history: List[Dict[str, Any]] = []
     live_status_message: Optional[str] = None
     estimated_remaining_sec: Optional[int] = None
+    storage_bytes: Optional[int] = 0
+
+class UserStorageQuota(BaseModel):
+    used_bytes: int
+    used_mb: float
+    used_gb: float
+    quota_bytes: int = 10 * 1024 * 1024 * 1024 # 10 GB
+    quota_gb: float = 10.0
+    percentage: float
+    total_videos: int

@@ -18,11 +18,55 @@ from app.models.user import User
 from app.models.job import Job
 from app.models.clip import Clip
 from app.models.usage import UsageLog
-from app.schemas.job import JobResponse, JobDetailResponse, JobSettings, JobCreate
+from app.schemas.job import JobResponse, JobDetailResponse, JobSettings, JobCreate, UserStorageQuota
 from app.schemas.clip import ClipResponse
 from app.tasks.orchestrator import run_pipeline
 
+USER_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024 # 10 GB per user
+
+def get_dir_size(path_str: str) -> int:
+    total = 0
+    if os.path.exists(path_str):
+        for root, dirs, files in os.walk(path_str):
+            for f in files:
+                fp = os.path.join(root, f)
+                try:
+                    total += os.path.getsize(fp)
+                except OSError:
+                    pass
+    return total
+
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+@router.get("/storage/quota", response_model=UserStorageQuota)
+async def get_user_storage_quota(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns current user's used storage in bytes/MB/GB against the 10 GB quota limit.
+    """
+    stmt = select(Job.id).where(Job.user_id == current_user.id)
+    job_ids = (await db.execute(stmt)).scalars().all()
+
+    total_bytes = 0
+    for j_id in job_ids:
+        job_dir = storage.get_full_path(f"jobs/{j_id}")
+        total_bytes += get_dir_size(job_dir)
+
+    used_mb = round(total_bytes / (1024 * 1024), 2)
+    used_gb = round(total_bytes / (1024 * 1024 * 1024), 3)
+    percentage = round(min(100.0, (total_bytes / USER_STORAGE_LIMIT_BYTES) * 100.0), 2)
+
+    return UserStorageQuota(
+        used_bytes=total_bytes,
+        used_mb=used_mb,
+        used_gb=used_gb,
+        quota_bytes=USER_STORAGE_LIMIT_BYTES,
+        quota_gb=10.0,
+        percentage=percentage,
+        total_videos=len(job_ids)
+    )
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 async def create_job(
@@ -51,7 +95,18 @@ async def create_job(
             detail=f"You already have {active_count} active jobs. Maximum allowed parallel jobs is {settings.MAX_PARALLEL_JOBS_PER_USER}."
         )
 
-    # 2. Determine source type and validate
+    # 2. Check 10 GB User Storage Quota
+    stmt_user_jobs = select(Job.id).where(Job.user_id == current_user.id)
+    user_job_ids = (await db.execute(stmt_user_jobs)).scalars().all()
+    user_used_bytes = sum(get_dir_size(storage.get_full_path(f"jobs/{jid}")) for jid in user_job_ids)
+
+    if user_used_bytes >= USER_STORAGE_LIMIT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Kapasitas penyimpanan 10 GB Anda sudah penuh. Silakan hapus beberapa project video lama di Dashboard/Pustaka untuk membebaskan ruang."
+        )
+
+    # 3. Determine source type and validate
     if file and file.filename:
         validate_video_file_extension(file.filename)
         source_type = "upload"
